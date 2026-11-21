@@ -99,6 +99,8 @@ function settingsView(){
   h+='<section class="card"><h2>Week starts on</h2><div class="row"><button class="btn'+(S.startDay===1?" p":" q")+' s" data-act="startday" data-n="1">Monday</button><button class="btn'+(S.startDay===0?" p":" q")+' s" data-act="startday" data-n="0">Sunday</button></div></section>';
   h+='<section class="card"><h2>Account</h2>'+(K.local?'<p class="small">On this phone only. Sign in to keep your recipes and plans on all your phones, encrypted.</p><div class="row"><button class="btn" data-act="join">Sign in or create a Pixora account</button></div>':
     '<p class="small">Signed in as '+esc(K.email||"")+'. Recipes, plans and lists are encrypted on this phone before they sync, so nobody else can read them, not even Pixora.</p><div class="row"><button class="btn q" data-act="signout">Sign out</button></div>')+'</section>';
+  h+='<section class="card"><h2>Delete my Meals data</h2><p class="small muted">Deletes your recipes, plans and grocery lists from this phone'+(K.local?"":" and your Pixora account")+'. It can\'t be undone. Your Pixora login and other Pixora apps aren\'t affected. To delete the Pixora login itself, email pixora3dstudios@gmail.com.</p>'+
+    '<div class="row"><button class="btn d" data-act="delall">Delete my Meals data</button></div></section>';
   return h;
 }
 
@@ -183,6 +185,8 @@ document.addEventListener("click",async function(e){
   else if(a==="seed"){S.recipes=S.recipes.concat(starters());S.seeded=true;save();render();K.track("starter_recipes");}
   else if(a==="savestaples"){S.staples=$("#staples").value.split(/\n/).map(function(x){return x.trim();}).filter(Boolean).slice(0,100);save();toast("Staples saved.");K.track("staples_edit");}
   else if(a==="startday"){S.startDay=+b.dataset.n;week=null;save();render();}
+  else if(a==="delall"){if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Tap again: delete everything in Meals";return;}
+    b.disabled=true;try{await K.deleteAppData();tab="plan";toast("Your Meals data is deleted. Your Pixora login still works.");}catch(x){b.disabled=false;toast("Couldn't delete. Check the connection and try again.");}}
   else if(a==="join")K.joinAccount();
   else if(a==="signout")K.signOut();
   else if(a==="close")closeDlg();
@@ -196,7 +200,7 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&S&&
 K.boot({
   app:"meals",title:"Meals",version:"meals-v1",blurb:"Plan the week and get your grocery list.",
   clean:M.clean,
-  onOpen:function(s){S=s;if(!S.recipes.length&&!S.seeded){S.recipes=starters();S.seeded=true;save();}render();},
+  onOpen:function(s,o){S=s;if(o&&o.fresh){S.seeded=true;save();}else if(!S.recipes.length&&!S.seeded){S.recipes=starters();S.seeded=true;save();}render();},
   onRemote:function(s){S=s;if(!$("#dlg").open)render();},
   onStatus:function(t){var st=$("#st");if(st)st.textContent=t;},
   onGate:function(shown){$("#app").hidden=shown;$("#tabs").hidden=shown;},
