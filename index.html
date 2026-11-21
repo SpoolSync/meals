@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src 'self' https://pixora-bca1f.firebaseapp.com; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Meals">
+<meta name="theme-color" content="#f0ede4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+<title>Meals</title>
+<style>
+:root{--paper:#f0ede4;--card:#fcfbf7;--ink:#1d1b16;--muted:#625e55;--line:#d9d4c7;--accent:#2f7d32;--accent-ink:#fff;--bad:#b83b26;
+  --display:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;--body:-apple-system,system-ui,"Segoe UI",sans-serif;--mono:ui-monospace,"SF Mono",Menlo,monospace}
+@media (prefers-color-scheme: dark){:root{--paper:#14130f;--card:#1f1d18;--ink:#ece8dd;--muted:#a29d90;--line:#36332b;--accent:#7ccf80;--accent-ink:#14130f;--bad:#f2907c;color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}h1{font-size:30px;line-height:1.05}h2{font-size:19px}h3{font-size:16px}
+p{margin:0}.muted{color:var(--muted)}.small{font-size:13px}.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+button,input,select,textarea{font:inherit;color:inherit}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.btn{border:1px solid var(--ink);background:transparent;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer;min-height:44px}
+.btn.p{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.btn.q{border-color:var(--line);font-weight:500}.btn.d{border-color:var(--bad);color:var(--bad)}
+.btn.s{min-height:36px;padding:6px 10px;font-size:14px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 11px;background:transparent}
+.card{background:var(--card);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline}
+.slot{display:grid;grid-template-columns:84px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.slot .k{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.meal{all:unset;cursor:pointer;overflow-wrap:anywhere;padding:4px 0}.meal:focus-visible{outline:2px solid var(--accent)}
+.add{all:unset;cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;padding:6px 4px;min-height:32px}
+.x{border:1px solid var(--line);background:transparent;border-radius:8px;min-width:36px;min-height:36px;cursor:pointer}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+.tabs button{all:unset;cursor:pointer;text-align:center;padding:12px 0 10px;font-weight:600;font-size:14px;color:var(--muted)}
+.tabs button[aria-current=page]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+.aisle{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:4px;margin-top:6px}
+.item{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.item input{width:22px;height:22px;margin:0}.item.done .nm{text-decoration:line-through;color:var(--muted)}
+.qty{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
+.rec{all:unset;box-sizing:border-box;cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);width:100%}
+.tag{font-family:var(--mono);font-size:11px;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--muted)}
+input[type=text],input[type=search],input[type=number],select,textarea{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:10px;min-height:44px;font-size:16px}
+textarea{min-height:140px;line-height:1.5}
+.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}.f small{font-weight:400;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog{border:0;border-radius:14px;padding:0;background:var(--card);color:var(--ink);width:min(560px,calc(100% - 20px));max-height:calc(100% - 20px)}
+dialog::backdrop{background:rgba(10,10,8,.55)}
+.form{padding:18px 16px;display:flex;flex-direction:column;gap:12px}
+.pick{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pick button{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:10px 12px;border-bottom:1px solid var(--line)}
+.pick button:hover,.pick button:focus-visible{background:var(--paper)}
+.ing{display:grid;grid-template-columns:90px 1fr;gap:8px;padding:4px 0;border-bottom:1px dotted var(--line)}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:16px;color:var(--muted);display:flex;flex-direction:column;gap:10px}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+[hidden]{display:none!important}
+@media (max-width:380px){.slot{grid-template-columns:70px 1fr auto}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap" id="app" hidden></main>
+<nav class="tabs" id="tabs" hidden aria-label="Sections">
+  <button data-tab="plan">Plan</button><button data-tab="list">Groceries</button><button data-tab="recipes">Recipes</button>
+</nav>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="firebase-app-compat.js"></script>
+<script src="firebase-auth-compat.js"></script>
+<script src="firebase-firestore-compat.js"></script>
+<script src="cloud.js"></script>
+<script src="pixora-summary.js"></script>
+<script src="pixora-usage.js"></script>
+<script src="pixora-kit.js"></script>
+<script src="meals-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
