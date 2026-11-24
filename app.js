@@ -101,6 +101,7 @@ function settingsView(){
   h+='<section class="card"><h2>Staples</h2><p class="small muted">Things you always have. They stay off the shopping list and show under "Probably have".</p>'+
     '<textarea id="staples" aria-label="Staples, one per line">'+esc(S.staples.join("\n"))+'</textarea><div class="row"><button class="btn" data-act="savestaples">Save staples</button></div></section>';
   h+='<section class="card"><h2>Week starts on</h2><div class="row"><button class="btn'+(S.startDay===1?" p":" q")+' s" data-act="startday" data-n="1">Monday</button><button class="btn'+(S.startDay===0?" p":" q")+' s" data-act="startday" data-n="0">Sunday</button></div></section>';
+  h+='<section class="card"><h2>Your copy</h2><p class="small muted">Download everything in Meals as a file you keep, and bring it back here or on a new phone. It\'s a plain file, not encrypted, so keep it somewhere private.</p><div class="row"><button class="btn" data-act="export">Download a copy</button><label class="btn q" style="cursor:pointer">Restore from a copy<input type="file" id="restore" accept=".json,application/json" hidden></label></div></section>';
   h+='<section class="card"><h2>Ideas or problems?</h2><p class="small muted">Tell Sachin what would make Meals better or what went wrong. Nothing from your data is sent.</p><div class="row"><button class="btn" data-act="feedback">Send feedback</button></div></section>';
   h+='<section class="card"><h2>Account</h2>'+(K.local?'<p class="small">On this phone only. Sign in to keep your recipes and plans on all your phones, encrypted.</p><div class="row"><button class="btn" data-act="join">Sign in or create a Pixora account</button></div>':
     '<p class="small">Signed in as '+esc(K.email||"")+'. Recipes, plans and lists are encrypted on this phone before they sync, so nobody else can read them, not even Pixora.</p><div class="row"><button class="btn q" data-act="signout">Sign out</button></div>')+'</section>';
@@ -213,6 +214,7 @@ document.addEventListener("click",async function(e){
   else if(a==="startday"){S.startDay=+b.dataset.n;week=null;save();render();}
   else if(a==="delall"){if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Tap again: delete everything in Meals";return;}
     b.disabled=true;try{await K.deleteAppData();tab="plan";toast("Your Meals data is deleted. Your Pixora login still works.");}catch(x){b.disabled=false;toast("Couldn't delete. Check the connection and try again.");}}
+  else if(a==="export")K.exportCopy();
   else if(a==="feedback"){if(window.PixoraFeedback)PixoraFeedback.open("meals","Meals");}
   else if(a==="join")K.joinAccount();
   else if(a==="signout")K.signOut();
@@ -239,4 +241,14 @@ K.boot({
     var planned=0;for(var i=0;i<7;i++)if((s.plan[M.addDays(t,i)]||[]).length)planned++;
     return {d:t,today:meals,left:left,planned7:planned};
   }
+});
+
+document.addEventListener("change",function(e){
+  if(e.target.id!=="restore"||!e.target.files[0])return;
+  var f=e.target.files[0],r=new FileReader();e.target.value="";
+  r.onload=function(){
+    if(!confirm("Replace what's in Meals now with this copy? What's here now is replaced."))return;
+    try{K.restoreCopy(String(r.result));toast("Restored from your copy.");}
+    catch(x){toast(x&&x.code==="wrongapp"?"That copy is from "+(x.app||"another app")+", not Meals.":"That file isn't a Meals copy.");}
+  };r.readAsText(f);
 });
