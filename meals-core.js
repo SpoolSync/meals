@@ -1,7 +1,7 @@
 /* Meals: the logic with no screen code, so it can be tested on its own. */
 (function(root){
 "use strict";
-var AISLES=["Produce","Meat & fish","Dairy & eggs","Bakery","Pantry","Spices & sauces","Frozen","Drinks","Household","Other"];
+var AISLES=["Produce","Chicken & fish","Dairy & eggs","Bakery","Pantry","Spices & sauces","Frozen","Drinks","Household","Other"];
 var SLOTS=["breakfast","lunch","dinner","snack"];
 var UNITS={tsp:"tsp",teaspoon:"tsp",teaspoons:"tsp",tbsp:"tbsp",tablespoon:"tbsp",tablespoons:"tbsp",cup:"cup",cups:"cup",
   g:"g",gram:"g",grams:"g",kg:"kg",ml:"ml",l:"l",litre:"l",liter:"l",litres:"l",liters:"l",oz:"oz",lb:"lb",lbs:"lb",pound:"lb",pounds:"lb",
@@ -10,7 +10,7 @@ var UNITS={tsp:"tsp",teaspoon:"tsp",teaspoons:"tsp",tbsp:"tbsp",tablespoon:"tbsp
 var GUESS=[
   ["Spices & sauces",/salt|pepper ?corn|black pepper|cumin|turmeric|garam masala|masala|chilli powder|chili powder|paprika|cinnamon|cardamom|clove(?!s? of garlic)|oregano|basil|thyme|spice|sauce|ketchup|mustard|mayo|vinegar|soy|bay lea/],
   ["Produce",/onion|garlic|ginger|tomato|potato|carrot|spinach|lettuce|pepper(?!corn)|capsicum|chilli|chili(?! powder)|cilantro|coriander leaves|parsley|mint|lemon|lime|apple|banana|berr|avocado|cucumber|broccoli|cauliflower|cabbage|mushroom|zucchini|eggplant|okra|beans? \(green\)|green beans|(?<!chick)peas|corn(?!flour|starch)|kale|celery|scallion|green onion|fruit|orange|mango|grape|herb/],
-  ["Meat & fish",/chicken|beef|pork|lamb|mutton|turkey|fish|salmon|tuna(?! can)|shrimp|prawn|bacon|sausage|mince|ground/],
+  ["Chicken & fish",/chicken|fish|salmon|tuna(?! can)|shrimp|prawn|tilapia|cod|basa|mince|ground/],
   ["Dairy & eggs",/milk(?! \(coconut\))|egg(?!plant)|butter|cheese|parmesan|feta|mozzarella|cheddar|paneer|yogurt|yoghurt|curd|cream|ghee/],
   ["Bakery",/bread|bun|tortilla|wrap|naan|roti|pita|bagel/],
   ["Frozen",/frozen|ice cream/],

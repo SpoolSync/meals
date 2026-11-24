@@ -25,9 +25,11 @@ function starters(){
     r("Chicken stir-fry",3,["dinner","quick"],["500g chicken breast","1 red bell pepper","1 head broccoli","2 carrots","3 cloves garlic","1 tbsp ginger","3 tbsp soy sauce","1 tbsp honey","1 cup jasmine rice"],"Cook the rice. Brown sliced chicken, set aside. Stir-fry vegetables with garlic and ginger, return chicken, add soy and honey."),
     r("Butter chicken",4,["dinner"],["700g chicken thighs","1 cup yogurt","2 tbsp butter chicken masala","1 can tomato puree","1/2 cup cream","3 tbsp butter","1 onion","4 cloves garlic","1 tbsp ginger","2 cups basmati rice"],"Marinate chicken in yogurt and half the masala. Sear. Soften onion, garlic and ginger in butter, add the rest of the masala and tomato, simmer, add chicken and cream. Serve with rice."),
     r("Pasta with tomato and spinach",2,["dinner","quick","vegetarian"],["250g pasta","1 can diced tomatoes","2 cups spinach","3 cloves garlic","2 tbsp olive oil","1/4 cup parmesan"],"Boil pasta. Fry garlic in oil, add tomatoes and simmer, stir in spinach. Toss with pasta and parmesan."),
-    r("Burrito bowls",4,["lunch","meal prep"],["2 cups rice","1 can black beans","500g ground beef","1 packet taco seasoning","1 cup corn","2 tomatoes","1 avocado","1 cup shredded cheese","1 lime"],"Cook rice. Brown beef with seasoning. Warm beans and corn. Build bowls with tomato, avocado, cheese and lime."),
+    r("Chicken burrito bowls",4,["lunch","meal prep"],["2 cups rice","1 can black beans","500g chicken thighs","1 packet taco seasoning","1 cup corn","2 tomatoes","1 avocado","1 cup shredded cheese","1 lime"],"Cook the rice. Season the chicken and cook until done, then slice. Warm the beans and corn. Build bowls with rice, chicken, beans, corn, chopped tomato, avocado and cheese. Squeeze lime over."),
     r("Greek salad wraps",2,["lunch","quick","vegetarian"],["2 large tortillas","1 cucumber","2 tomatoes","1/2 red onion","1/2 cup feta","1/4 cup olives","1/2 cup hummus"],"Spread hummus on the wraps, fill with chopped vegetables, feta and olives, roll."),
-    r("Paneer bhurji",3,["dinner","vegetarian","quick"],["400g paneer","1 onion","2 tomatoes","1 green chilli","1/2 tsp turmeric","1 tsp garam masala","1 tbsp butter","3 rotis"],"Crumble paneer. Fry onion and chilli in butter, add tomatoes and spices, then paneer for 3 minutes. Serve with roti.")
+    r("Paneer bhurji",3,["dinner","vegetarian","quick"],["400g paneer","1 onion","2 tomatoes","1 green chilli","1/2 tsp turmeric","1 tsp garam masala","1 tbsp butter","3 rotis"],"Crumble paneer. Fry onion and chilli in butter, add tomatoes and spices, then paneer for 3 minutes. Serve with roti."),
+    r("Lemon garlic salmon",2,["dinner","quick","fish"],["2 salmon fillets","2 cloves garlic","1 lemon","1 tbsp olive oil","2 cups green beans","1 cup rice"],"Cook the rice. Put salmon and green beans on a tray, top with olive oil, garlic and lemon slices. Bake at 200°C for 12 to 15 minutes."),
+    r("Vegan chickpea coconut curry",4,["dinner","vegan","vegetarian"],["2 cans chickpeas","1 can coconut milk","1 onion","2 cloves garlic","1 tbsp curry powder","2 cups spinach","1 cup rice"],"Cook the rice. Soften the onion and garlic, add curry powder, then chickpeas and coconut milk. Simmer 10 minutes, stir in spinach until wilted.")
   ];
 }
 
@@ -41,6 +43,17 @@ function render(){
 function header(eyebrow,title,right){
   return '<header class="top"><div><p class="eyebrow">'+esc(eyebrow)+'</p><h1>'+esc(title)+'</h1></div><div class="row">'+(right||"")+
     '<button class="btn q s" data-act="settings">Settings</button></div></header><button class="status" id="st" data-act="settings">'+esc(K.status())+'</button>';
+}
+/* The original starter set had a beef recipe. Pixora's recipes are chicken, fish, vegetarian or vegan only,
+   so an untouched copy of it is swapped for the chicken version (an edited copy is the person's own and stays). */
+function fixStarters(){
+  var fresh=starters(),nb=fresh.filter(function(r){return r.name==="Chicken burrito bowls";})[0],changed=false;
+  S.recipes.forEach(function(r,i){
+    if(r.name==="Burrito bowls"&&(r.ing||[]).some(function(g){return /ground beef/i.test(g.item);})&&/taco seasoning/i.test(JSON.stringify(r.ing))){
+      nb.id=r.id;nb.fav=r.fav;nb.made=r.made||0;S.recipes[i]=nb;changed=true;
+    }
+  });
+  if(changed)save();
 }
 function planView(){
   var t=today();week=week||M.weekStart(t,S.startDay);
@@ -229,7 +242,7 @@ document.addEventListener("visibilitychange",function(){if(!document.hidden&&S&&
 K.boot({
   app:"meals",title:"Meals",version:"meals-v1",blurb:"Plan the week and get your grocery list.",
   clean:M.clean,
-  onOpen:function(s,o){S=s;if(o&&o.fresh){S.seeded=true;save();}else if(!S.recipes.length&&!S.seeded){S.recipes=starters();S.seeded=true;save();}render();},
+  onOpen:function(s,o){S=s;fixStarters();if(o&&o.fresh){S.seeded=true;save();}else if(!S.recipes.length&&!S.seeded){S.recipes=starters();S.seeded=true;save();}render();},
   onRemote:function(s){S=s;if(!$("#dlg").open)render();},
   onStatus:function(t){var st=$("#st");if(st)st.textContent=t;},
   onGate:function(shown){$("#app").hidden=shown;$("#tabs").hidden=shown;},

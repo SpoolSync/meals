@@ -3,7 +3,7 @@ function t(name,fn){fn();n++;console.log("ok  "+name);}
 t("parses common ingredient lines",function(){
   assert.deepStrictEqual(M.parseLine("1 1/2 cups basmati rice"),{q:1.5,u:"cup",item:"basmati rice",aisle:"Pantry"});
   assert.deepStrictEqual(M.parseLine("2 large onions, chopped"),{q:2,u:"",item:"large onions, chopped",aisle:"Produce"});
-  assert.deepStrictEqual(M.parseLine("500g chicken thighs"),{q:500,u:"g",item:"chicken thighs",aisle:"Meat & fish"});
+  assert.deepStrictEqual(M.parseLine("500g chicken thighs"),{q:500,u:"g",item:"chicken thighs",aisle:"Chicken & fish"});
   assert.deepStrictEqual(M.parseLine("½ tsp turmeric"),{q:.5,u:"tsp",item:"turmeric",aisle:"Spices & sauces"});
   assert.deepStrictEqual(M.parseLine("Salt to taste"),{q:null,u:"",item:"Salt to taste",aisle:"Spices & sauces"});
   assert.deepStrictEqual(M.parseLine("1 can chickpeas"),{q:1,u:"can",item:"chickpeas",aisle:"Pantry"});
