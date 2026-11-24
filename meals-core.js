@@ -84,7 +84,7 @@ function groceries(state,from,days){
 }
 function clean(s){
   s=s&&typeof s==="object"?s:{};
-  var out={ts:+s.ts||0,recipes:[],plan:{},checked:{},extras:[],staples:[],startDay:s.startDay===0?0:1,listDays:[3,7,14].indexOf(+s.listDays)>=0?+s.listDays:7,seeded:!!s.seeded};
+  var out={ts:+s.ts||0,recipes:[],plan:{},checked:{},extras:[],staples:[],startDay:s.startDay===0?0:1,listDays:[3,7,14].indexOf(+s.listDays)>=0?+s.listDays:7,seeded:!!s.seeded,people:Math.min(20,Math.max(1,+s.people||2))};
   function str(v,n){return String(v==null?"":v).slice(0,n);}
   (Array.isArray(s.recipes)?s.recipes:[]).slice(0,1000).forEach(function(r){
     if(!r||!r.id)return;
@@ -102,6 +102,36 @@ function clean(s){
   out.staples=(Array.isArray(s.staples)?s.staples:["salt","black pepper","cooking oil"]).slice(0,100).map(function(x){return str(x,40);}).filter(Boolean);
   return out;
 }
-var api={qtyText:qtyText,AISLES:AISLES,SLOTS:SLOTS,parseLine:parseLine,lineText:lineText,fmtQ:fmtQ,key:key,guessAisle:guessAisle,groceries:groceries,clean:clean,addDays:addDays,weekStart:weekStart,iso:iso};
+/* Fill empty meal slots from the recipe box. Never touches a slot that already has something.
+   Picks recipes tagged for the slot (lunch can fall back to dinner recipes), favourites first, then the
+   ones made least, without repeating within the run. With leftovers on, a dinner that makes enough
+   for two meals also covers the next day's lunch (as a note, so groceries aren't doubled). */
+function autoPlan(state,days,opt){
+  opt=opt||{};var slots=opt.slots||["dinner"],people=Math.max(1,+opt.people||2),out=[],used={},seed=+opt.seed||1;
+  function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
+  function pool(slot){
+    var p=state.recipes.filter(function(r){return (r.tags||[]).indexOf(slot)>=0;});
+    if(!p.length&&slot==="lunch")p=state.recipes.filter(function(r){return (r.tags||[]).indexOf("dinner")>=0;});
+    return p;
+  }
+  function pick(slot){
+    var p=pool(slot);if(!p.length)return null;
+    var u=used[slot]=used[slot]||{},fresh=p.filter(function(r){return !u[r.id];});if(!fresh.length){u=used[slot]={};fresh=p;}
+    fresh=fresh.map(function(r){return {r:r,w:(r.fav?2:0)-Math.min(3,(r.made||0))*0.3+rnd()};}).sort(function(a,b){return b.w-a.w;});
+    u[fresh[0].r.id]=1;return fresh[0].r;
+  }
+  function has(d,slot){return (state.plan[d]||[]).some(function(m){return m.slot===slot;})||out.some(function(m){return m.d===d&&m.slot===slot;});}
+  days.forEach(function(d,i){
+    ["breakfast","lunch","dinner","snack"].forEach(function(slot){
+      if(slots.indexOf(slot)<0||has(d,slot))return;
+      var r=pick(slot);if(!r)return;
+      out.push({d:d,slot:slot,rid:r.id,text:"",serves:people});
+      if(opt.leftovers&&slot==="dinner"&&i+1<days.length&&(r.serves||0)>=people*2&&slots.indexOf("lunch")>=0&&!has(days[i+1],"lunch"))
+        out.push({d:days[i+1],slot:"lunch",rid:null,text:"Leftover "+r.name.toLowerCase(),serves:people});
+    });
+  });
+  return out;
+}
+var api={autoPlan:autoPlan,qtyText:qtyText,AISLES:AISLES,SLOTS:SLOTS,parseLine:parseLine,lineText:lineText,fmtQ:fmtQ,key:key,guessAisle:guessAisle,groceries:groceries,clean:clean,addDays:addDays,weekStart:weekStart,iso:iso};
 if(typeof module!=="undefined"&&module.exports)module.exports=api;else root.MealsCore=api;
 })(typeof self!=="undefined"?self:this);

@@ -8,7 +8,9 @@ function $(s){return document.querySelector(s);}
 function today(){return M.iso(new Date());}
 function rid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function dayName(s,long){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString("en-CA",long?{weekday:"long",month:"short",day:"numeric"}:{weekday:"short",day:"numeric"});}
-var tt=null;function toast(m){var t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;},3500);}
+var tt=null;var lastFill=null;
+function toastUndo(m){var t=$("#toast");t.innerHTML=esc(m)+' <button class="add" data-act="undofill" style="color:inherit;text-decoration:underline">Undo</button>';t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;lastFill=null;},8000);}
+function toast(m){var t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;},3500);}
 function save(){K.save(S);}
 function byId(id){return S.recipes.filter(function(r){return r.id===id;})[0];}
 
@@ -45,13 +47,15 @@ function planView(){
   var end=M.addDays(week,6),h=header("Plan",week===M.weekStart(t,S.startDay)?"This week":dayName(week)+" – "+dayName(end));
   h+='<div class="row"><button class="btn q s" data-act="wk" data-n="-7">← Previous</button><button class="btn q s" data-act="wk" data-n="0">This week</button><button class="btn q s" data-act="wk" data-n="7">Next →</button>'+
     '<button class="btn q s" data-act="copyweek">Copy last week here</button></div>';
+  var planned=0;for(var j=0;j<7;j++)planned+=(S.plan[M.addDays(week,j)]||[]).length;
+  if(S.recipes.length&&end>=t)h+='<div class="row"><button class="btn '+(planned<3?"p":"q")+' s" data-act="autofill">Fill the week for me</button>'+(planned<3?'<span class="small muted">Picks from your recipes. Change anything after.</span>':"")+'</div>';
   for(var i=0;i<7;i++){
     var d=M.addDays(week,i),list=S.plan[d]||[];
     h+='<section class="card day'+(d===t?" today":"")+'" aria-label="'+esc(dayName(d,true))+'"><div class="dayhead"><h2>'+esc(dayName(d,true))+'</h2>'+(d===t?'<span class="eyebrow">Today</span>':"")+'</div>';
     M.SLOTS.forEach(function(sl){
       list.filter(function(m){return m.slot===sl;}).forEach(function(m){
         var r=m.rid&&byId(m.rid),name=r?r.name:m.text;
-        h+='<div class="slot"><span class="k">'+SLOTNAME[sl]+'</span><button class="meal" data-act="meal" data-d="'+d+'" data-id="'+esc(m.id)+'">'+esc(name)+(r&&m.serves!==r.serves?' <span class="muted small">· '+m.serves+' servings</span>':"")+(r?"":' <span class="muted small">· not a recipe</span>')+'</button>'+
+        h+='<div class="slot"><span class="k">'+SLOTNAME[sl]+'</span><button class="meal" data-act="meal" data-d="'+d+'" data-id="'+esc(m.id)+'">'+esc(name)+(r&&m.serves!==r.serves?' <span class="muted small">· '+m.serves+' servings</span>':"")+(r||/^Leftover /.test(m.text)?"":' <span class="muted small">· not a recipe</span>')+'</button>'+
           '<button class="x" aria-label="Remove '+esc(name)+'" data-act="unplan" data-d="'+d+'" data-id="'+esc(m.id)+'">×</button></div>';
       });
     });
@@ -97,6 +101,7 @@ function settingsView(){
   h+='<section class="card"><h2>Staples</h2><p class="small muted">Things you always have. They stay off the shopping list and show under "Probably have".</p>'+
     '<textarea id="staples" aria-label="Staples, one per line">'+esc(S.staples.join("\n"))+'</textarea><div class="row"><button class="btn" data-act="savestaples">Save staples</button></div></section>';
   h+='<section class="card"><h2>Week starts on</h2><div class="row"><button class="btn'+(S.startDay===1?" p":" q")+' s" data-act="startday" data-n="1">Monday</button><button class="btn'+(S.startDay===0?" p":" q")+' s" data-act="startday" data-n="0">Sunday</button></div></section>';
+  h+='<section class="card"><h2>Ideas or problems?</h2><p class="small muted">Tell Sachin what would make Meals better or what went wrong. Nothing from your data is sent.</p><div class="row"><button class="btn" data-act="feedback">Send feedback</button></div></section>';
   h+='<section class="card"><h2>Account</h2>'+(K.local?'<p class="small">On this phone only. Sign in to keep your recipes and plans on all your phones, encrypted.</p><div class="row"><button class="btn" data-act="join">Sign in or create a Pixora account</button></div>':
     '<p class="small">Signed in as '+esc(K.email||"")+'. Recipes, plans and lists are encrypted on this phone before they sync, so nobody else can read them, not even Pixora.</p><div class="row"><button class="btn q" data-act="signout">Sign out</button></div>')+'</section>';
   h+='<section class="card"><h2>Delete my Meals data</h2><p class="small muted">Deletes your recipes, plans and grocery lists from this phone'+(K.local?"":" and your Pixora account")+'. It can\'t be undone. Your Pixora login and other Pixora apps aren\'t affected. To delete the Pixora login itself, email pixora3dstudios@gmail.com.</p>'+
@@ -182,11 +187,33 @@ document.addEventListener("click",async function(e){
   }
   else if(a==="delrecipe"){if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Tap again to delete";return;}
     S.recipes=S.recipes.filter(function(r){return r.id!==id;});Object.keys(S.plan).forEach(function(k){S.plan[k]=S.plan[k].filter(function(m){return m.rid!==id;});if(!S.plan[k].length)delete S.plan[k];});save();closeDlg();render();}
+  else if(a==="autofill"){
+    var people=S.people||2;
+    dlg('<h2>Fill the week</h2><p class="note">Fills only empty slots from '+(week<today()?"today":"this week")+' on, from your recipes. Favourites come up more. Nothing you\'ve planned changes.</p>'+
+      '<fieldset class="f" style="border:0;padding:0;margin:0"><legend>Which meals</legend><div class="row">'+
+      [["breakfast","Breakfast",false],["lunch","Lunch",true],["dinner","Dinner",true]].map(function(x){return '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-slot="'+x[0]+'"'+(x[2]?" checked":"")+'> '+x[1]+'</label>';}).join("")+'</div></fieldset>'+
+      '<label class="f">People eating<input type="number" id="af-people" min="1" max="20" value="'+people+'" inputmode="numeric"></label>'+
+      '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="af-left" checked> Big dinners cover the next day\'s lunch</label>'+
+      '<div class="row"><button class="btn p" data-act="doautofill">Fill it</button><button class="btn q" data-act="close">Cancel</button></div>');
+  }
+  else if(a==="doautofill"){
+    var slots=[].slice.call(document.querySelectorAll("[data-slot]:checked")).map(function(x){return x.dataset.slot;});
+    if(!slots.length){toast("Pick at least one meal.");return;}
+    var ppl=Math.min(20,Math.max(1,+$("#af-people").value||2));S.people=ppl;
+    var from=week<today()?today():week,days=[];for(var k=0;k<7;k++){var dd=M.addDays(week,k);if(dd>=from)days.push(dd);}
+    var add=M.autoPlan(S,days,{slots:slots,people:ppl,leftovers:$("#af-left").checked,seed:Date.now()%2147483646+1});
+    if(!add.length){closeDlg();toast("Nothing to fill: those slots are planned, or no recipes are tagged for them.");return;}
+    var ids=[];add.forEach(function(m){var id=rid();ids.push(id);(S.plan[m.d]=S.plan[m.d]||[]).push({id:id,slot:m.slot,rid:m.rid,text:m.text,serves:m.serves});});
+    lastFill=ids;save();closeDlg();render();K.track("autofill_week");
+    toastUndo("Added "+add.length+" meals. Your grocery list is updated.");
+  }
+  else if(a==="undofill"){if(!lastFill)return;Object.keys(S.plan).forEach(function(d){S.plan[d]=S.plan[d].filter(function(m){return lastFill.indexOf(m.id)<0;});if(!S.plan[d].length)delete S.plan[d];});lastFill=null;save();render();$("#toast").hidden=true;K.track("autofill_undo");}
   else if(a==="seed"){S.recipes=S.recipes.concat(starters());S.seeded=true;save();render();K.track("starter_recipes");}
   else if(a==="savestaples"){S.staples=$("#staples").value.split(/\n/).map(function(x){return x.trim();}).filter(Boolean).slice(0,100);save();toast("Staples saved.");K.track("staples_edit");}
   else if(a==="startday"){S.startDay=+b.dataset.n;week=null;save();render();}
   else if(a==="delall"){if(b.dataset.armed!=="1"){b.dataset.armed="1";b.textContent="Tap again: delete everything in Meals";return;}
     b.disabled=true;try{await K.deleteAppData();tab="plan";toast("Your Meals data is deleted. Your Pixora login still works.");}catch(x){b.disabled=false;toast("Couldn't delete. Check the connection and try again.");}}
+  else if(a==="feedback"){if(window.PixoraFeedback)PixoraFeedback.open("meals","Meals");}
   else if(a==="join")K.joinAccount();
   else if(a==="signout")K.signOut();
   else if(a==="close")closeDlg();

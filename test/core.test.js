@@ -41,3 +41,16 @@ t("clean drops junk",function(){
   assert.strictEqual(c.recipes.length,1);assert.strictEqual(c.recipes[0].ing.length,1);assert.strictEqual(c.recipes[0].ing[0].aisle,"Dairy & eggs");
 });
 console.log("\n"+n+" tests passed");
+(function(){
+  var M=require("../meals-core.js"),assert=require("assert");
+  var st={plan:{"2026-11-24":[{id:"a",slot:"dinner",rid:"x"}]},recipes:[
+    {id:"d1",name:"Dal",serves:4,tags:["dinner"]},{id:"d2",name:"Stir-fry",serves:2,tags:["dinner"]},{id:"b1",name:"Oats",serves:1,tags:["breakfast"]},{id:"l1",name:"Wraps",serves:2,tags:["lunch"]}]};
+  var days=["2026-11-24","2026-11-25","2026-11-26"];
+  var out=M.autoPlan(st,days,{slots:["breakfast","dinner"],people:2,seed:7});
+  assert.ok(!out.some(function(m){return m.d==="2026-11-24"&&m.slot==="dinner";}),"keeps planned slot");
+  assert.strictEqual(out.filter(function(m){return m.slot==="breakfast";}).length,3);
+  var din=out.filter(function(m){return m.slot==="dinner";});assert.strictEqual(din.length,2);assert.notStrictEqual(din[0].rid,din[1].rid,"no repeat");
+  var lo=M.autoPlan({plan:{},recipes:[{id:"d1",name:"Dal",serves:4,tags:["dinner"]}]},days,{slots:["lunch","dinner"],people:2,leftovers:true,seed:3});
+  assert.ok(lo.some(function(m){return m.text==="Leftover dal"&&m.d==="2026-11-25";}),"leftover lunch");
+  console.log("ok  fill the week");
+})();
