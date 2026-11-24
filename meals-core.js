@@ -60,8 +60,9 @@ function weekStart(s,startDay){var p=s.split("-"),d=new Date(+p[0],+p[1]-1,+p[2]
 /* The grocery list for a run of days: every planned recipe, scaled to its servings, merged by item and unit,
    minus pantry staples. Returns {aisles:[[name,[rows]]], staples:[rows]}. Row: {k,item,q,u,aisle,from:[recipe names]} */
 function groceries(state,from,days){
-  var byId={},rows={},order=[],staples={};
+  var byId={},rows={},order=[],staples={},have={};
   (state.staples||[]).forEach(function(s){staples[key(s)]=1;});
+  (state.pantry||[]).forEach(function(p){have[key(p.item)]=p;});
   (state.recipes||[]).forEach(function(r){byId[r.id]=r;});
   for(var i=0;i<days;i++){
     (state.plan[addDays(from,i)]||[]).forEach(function(m){
@@ -76,15 +77,52 @@ function groceries(state,from,days){
       });
     });
   }
-  var groups={},st=[];
-  order.forEach(function(k){var r=rows[k];if(staples[key(r.item)]){st.push(r);return;}(groups[r.aisle]=groups[r.aisle]||[]).push(r);});
+  var groups={},st=[],hv=[];
+  order.forEach(function(k){var r=rows[k];if(staples[key(r.item)]){st.push(r);return;}if(have[key(r.item)]){hv.push(r);return;}(groups[r.aisle]=groups[r.aisle]||[]).push(r);});
   (state.extras||[]).forEach(function(x){var r={k:"x|"+x.id,item:x.item,q:x.q,u:x.u||"",aisle:x.aisle||guessAisle(x.item),from:[],extra:x.id};(groups[r.aisle]=groups[r.aisle]||[]).push(r);});
   var aisles=AISLES.filter(function(a){return groups[a];}).map(function(a){return [a,groups[a].sort(function(x,y){return x.item.localeCompare(y.item);})];});
-  return {aisles:aisles,staples:st};
+  return {aisles:aisles,staples:st,have:hv};
+}
+/* Kitchen items running out of time: use by today+days. Sorted soonest first. */
+function expiring(state,today,days){
+  var lim=addDays(today,days==null?3:days);
+  return (state.pantry||[]).filter(function(p){return p.exp&&p.exp<=lim;}).sort(function(a,b){return a.exp.localeCompare(b.exp);});
+}
+/* Recipes that use any of these items, most matches first. */
+function usesUp(state,items){
+  var ks=items.map(function(p){return key(p.item);}).filter(Boolean);
+  return (state.recipes||[]).map(function(r){var hit=ks.filter(function(k){return (r.ing||[]).some(function(g){var gk=key(g.item);return gk===k||gk.indexOf(k)>=0||k.indexOf(gk)>=0&&gk.length>2;});});return {r:r,hit:hit};})
+    .filter(function(x){return x.hit.length;}).sort(function(a,b){return b.hit.length-a.hit.length;});
+}
+/* A whole recipe pasted from a website or notes: name, servings, ingredients, method. */
+function parseRecipe(text){
+  var lines=String(text||"").replace(/\r/g,"").split("\n").map(function(l){return l.replace(/^\s*[-•*▢□☐✓]\s*/,"").trim();});
+  var out={name:"",serves:null,ing:[],steps:[]},mode="auto",HEAD_I=/^(ingredients?|you('|’)ll need|what you need)\b:?$/i,HEAD_S=/^(method|instructions?|directions?|steps?|preparation)\b:?$/i;
+  lines.forEach(function(l){
+    if(!l)return;
+    var sv=/^(serves|servings?|yield|makes)\s*:?\s*(\d+)/i.exec(l);if(sv){out.serves=+sv[2];return;}
+    if(HEAD_I.test(l)){mode="ing";return;}if(HEAD_S.test(l)){mode="steps";return;}
+    if(/^(prep|cook|total|active) time|^(nutrition|calories|notes?)\b/i.test(l))return;
+    var step=l.replace(/^(step\s*)?\d+[.)]\s+(?=[A-Za-z])/i,"");
+    var p=parseLine(l),looksIng=p&&l.length<90&&(p.q!=null||/^(salt|pepper|oil|water)\b/i.test(l))&&!/[.!]\s+[A-Z]/.test(l);
+    if(mode==="steps"||(mode!=="ing"&&!looksIng&&out.ing.length&&l.length>40)){out.steps.push(step);mode=mode==="auto"?"steps":mode;return;}
+    if(mode==="ing"||looksIng){if(p)out.ing.push(p);return;}
+    if(!out.name&&l.length<80){out.name=l;return;}
+    out.steps.push(step);
+  });
+  return {name:out.name,serves:out.serves,ing:out.ing,steps:out.steps.join("\n")};
+}
+/* Minutes mentioned in a step: "bake 12 to 15 minutes" -> 15, "simmer 1 hour" -> 60. */
+function timerIn(step){
+  var s=String(step||"").toLowerCase(),m;
+  if((m=/(\d+(?:\.\d+)?)\s*(?:to|-|–)\s*(\d+(?:\.\d+)?)\s*(min|minutes|mins|hours?|hrs?)\b/.exec(s)))return Math.round(+m[2]*(/h/.test(m[3])?60:1));
+  if((m=/(\d+(?:\.\d+)?)\s*(min|minutes|mins|hours?|hrs?)\b/.exec(s)))return Math.round(+m[1]*(/h/.test(m[2])?60:1));
+  return null;
 }
 function clean(s){
   s=s&&typeof s==="object"?s:{};
-  var out={ts:+s.ts||0,recipes:[],plan:{},checked:{},extras:[],staples:[],startDay:s.startDay===0?0:1,listDays:[3,7,14].indexOf(+s.listDays)>=0?+s.listDays:7,seeded:!!s.seeded,people:Math.min(20,Math.max(1,+s.people||2))};
+  var out={ts:+s.ts||0,recipes:[],plan:{},checked:{},extras:[],staples:[],startDay:s.startDay===0?0:1,listDays:[3,7,14].indexOf(+s.listDays)>=0?+s.listDays:7,seeded:!!s.seeded,people:Math.min(20,Math.max(1,+s.people||2)),pantry:[]};
+  (Array.isArray(s.pantry)?s.pantry:[]).slice(0,300).forEach(function(p){if(p&&p.item)out.pantry.push({id:str(p.id,24),item:str(p.item,80),exp:/^\d{4}-\d{2}-\d{2}$/.test(p.exp)?p.exp:""});});
   function str(v,n){return String(v==null?"":v).slice(0,n);}
   (Array.isArray(s.recipes)?s.recipes:[]).slice(0,1000).forEach(function(r){
     if(!r||!r.id)return;
@@ -109,6 +147,7 @@ function clean(s){
 function autoPlan(state,days,opt){
   opt=opt||{};var slots=opt.slots||["dinner"],people=Math.max(1,+opt.people||2),out=[],used={},seed=+opt.seed||1;
   function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
+  var prefer={};(opt.prefer||[]).forEach(function(id){prefer[id]=1;});
   function pool(slot){
     var p=state.recipes.filter(function(r){return (r.tags||[]).indexOf(slot)>=0;});
     if(!p.length&&slot==="lunch")p=state.recipes.filter(function(r){return (r.tags||[]).indexOf("dinner")>=0;});
@@ -117,7 +156,7 @@ function autoPlan(state,days,opt){
   function pick(slot){
     var p=pool(slot);if(!p.length)return null;
     var u=used[slot]=used[slot]||{},fresh=p.filter(function(r){return !u[r.id];});if(!fresh.length){u=used[slot]={};fresh=p;}
-    fresh=fresh.map(function(r){return {r:r,w:(r.fav?2:0)-Math.min(3,(r.made||0))*0.3+rnd()};}).sort(function(a,b){return b.w-a.w;});
+    fresh=fresh.map(function(r){return {r:r,w:(r.fav?2:0)-Math.min(3,(r.made||0))*0.3+rnd()+(prefer[r.id]?2.5:0)};}).sort(function(a,b){return b.w-a.w;});
     u[fresh[0].r.id]=1;return fresh[0].r;
   }
   function has(d,slot){return (state.plan[d]||[]).some(function(m){return m.slot===slot;})||out.some(function(m){return m.d===d&&m.slot===slot;});}
@@ -132,6 +171,6 @@ function autoPlan(state,days,opt){
   });
   return out;
 }
-var api={autoPlan:autoPlan,qtyText:qtyText,AISLES:AISLES,SLOTS:SLOTS,parseLine:parseLine,lineText:lineText,fmtQ:fmtQ,key:key,guessAisle:guessAisle,groceries:groceries,clean:clean,addDays:addDays,weekStart:weekStart,iso:iso};
+var api={autoPlan:autoPlan,expiring:expiring,usesUp:usesUp,parseRecipe:parseRecipe,timerIn:timerIn,qtyText:qtyText,AISLES:AISLES,SLOTS:SLOTS,parseLine:parseLine,lineText:lineText,fmtQ:fmtQ,key:key,guessAisle:guessAisle,groceries:groceries,clean:clean,addDays:addDays,weekStart:weekStart,iso:iso};
 if(typeof module!=="undefined"&&module.exports)module.exports=api;else root.MealsCore=api;
 })(typeof self!=="undefined"?self:this);

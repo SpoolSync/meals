@@ -54,3 +54,18 @@ console.log("\n"+n+" tests passed");
   assert.ok(lo.some(function(m){return m.text==="Leftover dal"&&m.d==="2026-11-25";}),"leftover lunch");
   console.log("ok  fill the week");
 })();
+(function(){
+  var M=require("../meals-core.js"),assert=require("assert");
+  var r=M.parseRecipe("Lemon Herb Chicken\nServes: 4\nPrep time: 10 min\nIngredients\n▢ 4 chicken thighs\n▢ 2 tbsp olive oil\n▢ 1 lemon, juiced\nSalt to taste\nInstructions\n1. Mix the oil, lemon and salt.\n2. Coat the chicken and roast at 220°C for 25 to 30 minutes.");
+  assert.strictEqual(r.name,"Lemon Herb Chicken");assert.strictEqual(r.serves,4);assert.strictEqual(r.ing.length,4);assert.strictEqual(r.ing[0].item,"chicken thighs");
+  assert.ok(/^Mix the oil/.test(r.steps)&&r.steps.split("\n").length===2);
+  var r2=M.parseRecipe("Veg fried rice\n2 cups cooked rice\n1 cup frozen peas\n2 eggs\nHeat a wok until very hot and add oil, then the rice. Fry for 5 minutes.");
+  assert.strictEqual(r2.ing.length,3);assert.ok(/Heat a wok/.test(r2.steps));
+  assert.strictEqual(M.timerIn("Bake for 12 to 15 minutes"),15);assert.strictEqual(M.timerIn("Simmer 1 hour"),60);assert.strictEqual(M.timerIn("Stir well"),null);
+  var st={pantry:[{id:"1",item:"Spinach",exp:"2026-11-25"},{id:"2",item:"rice",exp:""}],recipes:[{id:"a",name:"Dal",ing:[{item:"spinach"}]},{id:"b",name:"Oats",ing:[{item:"oats"}]}],plan:{"2026-11-24":[{id:"m",slot:"dinner",rid:"c",serves:2}]}};
+  assert.deepStrictEqual(M.expiring(st,"2026-11-24",3).map(function(p){return p.item;}),["Spinach"]);
+  assert.strictEqual(M.usesUp(st,M.expiring(st,"2026-11-24",3))[0].r.id,"a");
+  st.recipes.push({id:"c",name:"Fried rice",serves:2,ing:[{item:"rice",q:1,u:"cup"},{item:"peas",q:1,u:"cup"}]});
+  var g=M.groceries(st,"2026-11-24",1);assert.deepStrictEqual(g.have.map(function(x){return x.item;}),["rice"]);assert.strictEqual(g.aisles.length,1);
+  console.log("ok  paste a recipe, timers, pantry");
+})();

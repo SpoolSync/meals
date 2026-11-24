@@ -61,6 +61,7 @@ function planView(){
   h+='<div class="row"><button class="btn q s" data-act="wk" data-n="-7">← Previous</button><button class="btn q s" data-act="wk" data-n="0">This week</button><button class="btn q s" data-act="wk" data-n="7">Next →</button>'+
     '<button class="btn q s" data-act="copyweek">Copy last week here</button></div>';
   var planned=0;for(var j=0;j<7;j++)planned+=(S.plan[M.addDays(week,j)]||[]).length;
+  h+=useItUp();
   if(S.recipes.length&&end>=t)h+='<div class="row"><button class="btn '+(planned<3?"p":"q")+' s" data-act="autofill">Fill the week for me</button>'+(planned<3?'<span class="small muted">Picks from your recipes. Change anything after.</span>':"")+'</div>';
   for(var i=0;i<7;i++){
     var d=M.addDays(week,i),list=S.plan[d]||[];
@@ -83,8 +84,9 @@ function listView(){
   var h=header("Groceries",left?left+" to get":total?"All set":"Nothing yet",'<button class="btn q s" data-act="share">Share list</button>');
   h+='<div class="row"><label class="small muted" for="days">For the next</label><select id="days" data-act="days" style="width:auto;min-height:36px;padding:4px 8px">'+
     [3,7,14].map(function(n){return '<option value="'+n+'"'+(S.listDays===n?" selected":"")+'>'+n+' days</option>';}).join("")+'</select>'+
-    '<button class="btn q s" data-act="extra">Add an item</button>'+(total-left?'<button class="btn q s" data-act="clearchecked">Clear ticked</button>':"")+'</div>';
-  if(!total&&!g.staples.length)return h+'<div class="empty"><p>Plan meals from your recipes and their ingredients land here, added up and sorted by aisle. You can also add anything else you need.</p><div class="row"><button class="btn p" data-act="tab" data-t="plan">Plan meals</button></div></div>';
+    '<button class="btn q s" data-act="extra">Add an item</button>'+(total-left?'<button class="btn q s" data-act="tokitchen">Bought: put ticked in kitchen</button><button class="btn q s" data-act="clearchecked">Clear ticked</button>':"")+'</div>';
+  var kitchen=kitchenCard();
+  if(!total&&!g.staples.length&&!g.have.length)return h+'<div class="empty"><p>Plan meals from your recipes and their ingredients land here, added up and sorted by aisle. You can also add anything else you need.</p><div class="row"><button class="btn p" data-act="tab" data-t="plan">Plan meals</button></div></div>'+kitchen;
   g.aisles.forEach(function(a){
     h+='<section class="card"><p class="aisle">'+esc(a[0])+'</p>';
     a[1].forEach(function(x){
@@ -95,11 +97,13 @@ function listView(){
     });
     h+='</section>';
   });
+  if(g.have.length)h+='<section class="card"><p class="aisle">Already in your kitchen</p><p class="small muted">'+esc(g.have.map(function(x){return [M.qtyText(x.q,x.u),x.item].filter(Boolean).join(" ");}).join(", "))+'</p></section>';
   if(g.staples.length)h+='<section class="card"><p class="aisle">Probably have · your staples</p><p class="small muted">'+esc(g.staples.map(function(x){return x.item;}).join(", "))+'</p><p class="small muted">Change staples in Settings.</p></section>';
-  return h;
+  return h+kitchen;
 }
 function recipesView(){
   var h=header("Recipes",S.recipes.length+" saved",'<button class="btn p s" data-act="newrecipe">New recipe</button>');
+  h+='<div class="row"><button class="btn q s" data-act="pasterecipe">Paste a whole recipe</button></div>';
   h+='<input type="search" id="rq" placeholder="Search recipes, ingredients or tags" value="'+esc(q)+'" aria-label="Search recipes">';
   var qq=q.toLowerCase(),list=S.recipes.filter(function(r){return !qq||(r.name+" "+r.tags.join(" ")+" "+r.ing.map(function(i){return i.item;}).join(" ")).toLowerCase().indexOf(qq)>=0;})
     .sort(function(a,b){return (b.fav-a.fav)||(b.made-a.made)||a.name.localeCompare(b.name);});
@@ -148,12 +152,12 @@ function recipeView(r){
   dlg('<h2>'+esc(r.name)+'</h2><div class="row"><label class="small muted" for="v-sv">Servings</label><input type="number" id="v-sv" min="1" max="50" value="'+r.serves+'" style="width:90px;min-height:36px"></div>'+
     '<section id="v-ing"></section>'+(r.steps?'<h3>Method</h3><p style="white-space:pre-wrap">'+esc(r.steps)+'</p>':"")+
     (r.tags.length?'<div class="row">'+r.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>';}).join("")+'</div>':"")+
-    '<div class="row"><button class="btn" data-act="editrecipe" data-id="'+esc(r.id)+'">Edit</button><button class="btn q" data-act="fav" data-id="'+esc(r.id)+'">'+(r.fav?"★ Unfavourite":"☆ Favourite")+'</button><button class="btn q" data-act="close">Close</button></div>');
+    '<div class="row"><button class="btn p" data-act="cook" data-id="'+esc(r.id)+'">Start cooking</button><button class="btn" data-act="editrecipe" data-id="'+esc(r.id)+'">Edit</button><button class="btn q" data-act="fav" data-id="'+esc(r.id)+'">'+(r.fav?"★ Unfavourite":"☆ Favourite")+'</button><button class="btn q" data-act="close">Close</button></div>');
   function draw(){var f=(+$("#v-sv").value||r.serves)/r.serves;$("#v-ing").innerHTML=r.ing.map(function(i){var g={q:i.q==null?null:i.q*f,u:i.u};return '<div class="ing"><span class="mono small">'+esc(M.qtyText(g.q,g.u))+'</span><span>'+esc(i.item)+'</span></div>';}).join("");}
   draw();$("#v-sv").addEventListener("input",draw);K.track("recipe_view");
 }
-function recipeEdit(r){
-  var isNew=!r;r=r||{id:rid(),name:"",serves:2,tags:[],ing:[],steps:"",fav:false,made:0};
+function recipeEdit(r,asNew){
+  var isNew=!r||!!asNew;r=r||{id:rid(),name:"",serves:2,tags:[],ing:[],steps:"",fav:false,made:0};
   dlg('<h2>'+(isNew?"New recipe":"Edit recipe")+'</h2><label class="f">Name<input type="text" id="e-name" maxlength="80" value="'+esc(r.name)+'"></label>'+
     '<div class="two"><label class="f">Serves<input type="number" id="e-serves" min="1" max="50" value="'+r.serves+'"></label><label class="f">Tags<input type="text" id="e-tags" value="'+esc(r.tags.join(", "))+'" placeholder="dinner, quick"></label></div>'+
     '<label class="f">Ingredients<small>One per line, like "2 cups rice" or "1 onion". Paste a whole list from a website.</small><textarea id="e-ing">'+esc(r.ing.map(M.lineText).join("\n"))+'</textarea></label>'+
@@ -161,6 +165,58 @@ function recipeEdit(r){
     '<div class="row"><button class="btn p" data-act="saverecipe" data-id="'+esc(r.id)+'" data-new="'+(isNew?1:0)+'">Save</button><button class="btn q" data-act="close">Cancel</button>'+
     (isNew?"":'<button class="btn d" data-act="delrecipe" data-id="'+esc(r.id)+'">Delete</button>')+'</div>');
 }
+/* What's in the fridge and cupboard right now, with use-by dates. Things in here drop off the grocery list,
+   and ones about to go off are suggested first when planning. */
+function useby(p){if(!p.exp)return "";var d=Math.round((Date.parse(p.exp+"T12:00:00")-Date.parse(today()+"T12:00:00"))/864e5);return d<0?"past its date":d===0?"use today":d===1?"use by tomorrow":"use by "+dayName(p.exp);}
+function kitchenCard(){
+  var list=S.pantry.slice().sort(function(a,b){return (a.exp||"9999").localeCompare(b.exp||"9999")||a.item.localeCompare(b.item);});
+  var h='<section class="card"><div class="dayhead"><h2>In your kitchen</h2><button class="add" data-act="addkitchen">+ Add</button></div>';
+  if(!list.length)return h+'<p class="small muted">Add what you have, with a use-by date if it goes off. Those drop off this list and get used first when you plan.</p></section>';
+  list.forEach(function(p){var u=useby(p),soon=p.exp&&p.exp<=M.addDays(today(),2);
+    h+='<div class="slot" style="grid-template-columns:1fr auto auto"><span>'+esc(p.item)+(u?' <span class="small" style="'+(soon?"color:var(--bad);font-weight:600":"color:var(--muted)")+'">· '+esc(u)+'</span>':"")+'</span>'+
+      '<button class="add" data-act="editkitchen" data-id="'+esc(p.id)+'" style="font-size:13px">date</button><button class="x" aria-label="Used up: remove '+esc(p.item)+'" data-act="usedup" data-id="'+esc(p.id)+'">×</button></div>';});
+  return h+'<p class="small muted">Tap × when it\'s used up.</p></section>';
+}
+function useItUp(){
+  var ex=M.expiring(S,today(),3);if(!ex.length)return "";
+  var rs=M.usesUp(S,ex).slice(0,3);
+  return '<section class="card" style="border:2px solid var(--bad)"><h2>Use it up</h2><p class="small">'+esc(ex.map(function(p){return p.item+" ("+useby(p)+")";}).join(", "))+'</p>'+
+    (rs.length?'<p class="small muted">Recipes that use them: '+rs.map(function(x){return '<button class="add" data-act="openrecipe" data-id="'+esc(x.r.id)+'">'+esc(x.r.name)+'</button>';}).join(" · ")+'. Fill the week picks these first.</p>':'<p class="small muted">None of your recipes use these yet.</p>')+'</section>';
+}
+/* Cook mode: one step at a time, big text, screen kept on, timers from the step text. */
+var cook=null,wake=null,timer=null;
+async function keepAwake(on){try{if(on&&"wakeLock" in navigator){wake=await navigator.wakeLock.request("screen");}else if(!on&&wake){await wake.release();wake=null;}}catch(e){}}
+document.addEventListener("visibilitychange",function(){if(cook&&document.visibilityState==="visible")keepAwake(true);});
+function cookOpen(r){
+  var steps=(r.steps||"").replace(/([.!])\s+(?=[A-Z])/g,"$1\n").split(/\n+/).map(function(x){return x.trim();}).filter(Boolean);
+  if(!steps.length)steps=["No method written yet. Add one with Edit."];
+  cook={r:r,steps:steps,i:-1,sv:r.serves,got:{}};keepAwake(true);K.track("cook_start");drawCook();
+}
+function drawCook(){
+  var c=cook,r=c.r,f=c.sv/r.serves,d=$("#dlg");
+  var h='<div class="form cook">';
+  if(c.i<0){
+    h+='<p class="eyebrow">Get ready</p><h2>'+esc(r.name)+'</h2><div class="row"><label class="small muted" for="c-sv">Servings</label><input type="number" id="c-sv" min="1" max="50" value="'+c.sv+'" style="width:90px;min-height:36px"></div>'+
+      r.ing.map(function(i,ix){var q=i.q==null?null:i.q*f;return '<label class="item'+(c.got[ix]?" done":"")+'"><input type="checkbox" data-act="cookgot" data-i="'+ix+'"'+(c.got[ix]?" checked":"")+'><span class="nm">'+esc(i.item)+'</span><span class="qty">'+esc(M.qtyText(q,i.u))+'</span></label>';}).join("")+
+      '<div class="row"><button class="btn p" data-act="cooknext">Start: step 1 of '+c.steps.length+'</button><button class="btn q" data-act="cookend">Close</button></div>';
+  }else{
+    var st=c.steps[c.i],m=M.timerIn(st);
+    h+='<p class="eyebrow">Step '+(c.i+1)+' of '+c.steps.length+' · '+esc(r.name)+'</p><p class="cookstep">'+esc(st)+'</p>'+
+      (m?'<div class="row"><button class="btn" data-act="cooktimer" data-m="'+m+'">Start a '+(m>=60?(Math.floor(m/60)+" h"+(m%60?" "+m%60+" min":"")):m+" min")+' timer</button></div>':"")+
+      '<p class="cooktimer" id="c-timer" aria-live="polite">'+(timer?timerText():"")+'</p>'+
+      '<div class="row"><button class="btn q" data-act="cookprev">← Back</button>'+(c.i+1<c.steps.length?'<button class="btn p" data-act="cooknext">Next step →</button>':'<button class="btn p" data-act="cookdone">Done</button>')+'<button class="btn q" data-act="cookend">Close</button></div>';
+  }
+  d.innerHTML=h+'</div>';if(!d.open)d.showModal();
+  var sv=$("#c-sv");if(sv)sv.addEventListener("input",function(){c.sv=Math.max(1,+sv.value||r.serves);var pos=sv.selectionStart;drawCook();var n=$("#c-sv");n.focus();});
+}
+function timerText(){var left=Math.max(0,Math.round((timer.end-Date.now())/1000));return left?("⏱ "+Math.floor(left/60)+":"+String(left%60).padStart(2,"0")+" left"):"⏰ Time's up";}
+function beep(){try{var ac=new (window.AudioContext||window.webkitAudioContext)();[0,0.35,0.7].forEach(function(t){var o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;o.connect(g);g.connect(ac.destination);g.gain.setValueAtTime(0.25,ac.currentTime+t);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+0.2);});}catch(e){}try{navigator.vibrate&&navigator.vibrate([300,150,300,150,300]);}catch(e){}}
+function startTimer(min){
+  clearInterval(timer&&timer.iv);timer={end:Date.now()+min*60000};K.track("cook_timer");
+  timer.iv=setInterval(function(){var el=$("#c-timer");if(el)el.textContent=timerText();if(Date.now()>=timer.end){clearInterval(timer.iv);timer.done=true;beep();toast("Timer done.");}},1000);
+  var el=$("#c-timer");if(el)el.textContent=timerText();
+}
+function cookEnd(){cook=null;keepAwake(false);if(timer&&!timer.done){/* keep running in the background toast */}closeDlg();}
 function shareText(){
   var r=listRange(),g=M.groceries(S,r.from,r.days),lines=["Groceries"];
   g.aisles.forEach(function(a){var left=a[1].filter(function(x){return !S.checked[x.k];});if(!left.length)return;lines.push("",a[0]);left.forEach(function(x){lines.push("- "+[M.qtyText(x.q,x.u),x.item].filter(Boolean).join(" "));});});
@@ -188,6 +244,25 @@ document.addEventListener("click",async function(e){
   else if(a==="unextra"){e.preventDefault();S.extras=S.extras.filter(function(x){return x.id!==id;});delete S.checked["x|"+id];save();render();}
   else if(a==="share"){var t=shareText();K.track("share_list");if(navigator.share){try{await navigator.share({text:t});}catch(x){}}else{try{await navigator.clipboard.writeText(t);toast("List copied.");}catch(x){toast("Couldn't copy.");}}}
   else if(a==="newrecipe")recipeEdit(null);
+  else if(a==="pasterecipe")dlg('<h2>Paste a whole recipe</h2><p class="small muted">Copy the recipe from a website, notes or a message, with its title, ingredients and method. You can check everything before saving.</p><textarea id="pr-text" style="min-height:260px" placeholder="Lemon herb chicken&#10;Serves 4&#10;Ingredients&#10;4 chicken thighs&#10;2 tbsp olive oil&#10;Method&#10;Roast at 220°C for 25 minutes."></textarea><div class="row"><button class="btn p" data-act="parserecipe">Read it</button><button class="btn q" data-act="close">Cancel</button></div>');
+  else if(a==="parserecipe"){var pr=M.parseRecipe($("#pr-text").value);if(!pr.ing.length){toast("Couldn't find ingredients. Put each on its own line, like 2 cups rice.");return;}
+    var txt=(pr.name+" "+pr.steps).toLowerCase(),tags=[];if(/breakfast|oats|pancake|omelette/.test(txt))tags.push("breakfast");else if(/salad|wrap|sandwich/.test(txt))tags.push("lunch");else tags.push("dinner");
+    K.track("recipe_paste");recipeEdit({id:rid(),name:pr.name||"",serves:pr.serves||2,tags:tags,ing:pr.ing,steps:pr.steps,fav:false,made:0},true);}
+  else if(a==="openrecipe"){var orr=byId(id);if(orr)recipeView(orr);}
+  else if(a==="cook"){var cr=byId(id);if(cr)cookOpen(cr);}
+  else if(a==="cookgot"){cook.got[+b.dataset.i]=b.checked;var row=b.closest(".item");if(row)row.classList.toggle("done",b.checked);}
+  else if(a==="cooknext"){cook.i++;drawCook();}
+  else if(a==="cookprev"){cook.i=Math.max(-1,cook.i-1);drawCook();}
+  else if(a==="cooktimer")startTimer(+b.dataset.m);
+  else if(a==="cookdone"){var cr2=cook.r;cr2.made=(cr2.made||0)+1;save();cookEnd();toast("Enjoy!");K.track("cook_done");}
+  else if(a==="cookend")cookEnd();
+  else if(a==="addkitchen")dlg('<h2>Add to your kitchen</h2><p class="small muted">One per line. Add a use-by date to things that go off.</p><textarea id="k-items" placeholder="spinach&#10;yogurt&#10;rice"></textarea><label class="f">Use by (for all of these, optional)<input type="date" id="k-exp"></label><div class="row"><button class="btn p" data-act="savekitchen">Add</button><button class="btn q" data-act="close">Cancel</button></div>');
+  else if(a==="savekitchen"){var ex=$("#k-exp").value||"";$("#k-items").value.split(/\n/).map(function(x){return x.trim();}).filter(Boolean).slice(0,50).forEach(function(it){var p=M.parseLine(it);S.pantry.push({id:rid(),item:(p?p.item:it).slice(0,80),exp:ex});});save();closeDlg();render();K.track("kitchen_add");}
+  else if(a==="editkitchen"){var pk=S.pantry.filter(function(p){return p.id===id;})[0];if(pk)dlg('<h2>'+esc(pk.item)+'</h2><label class="f">Use by<input type="date" id="k-exp1" value="'+pk.exp+'"></label><div class="row"><button class="btn p" data-act="savekitchen1" data-id="'+esc(id)+'">Save</button><button class="btn q" data-act="close">Cancel</button></div>');}
+  else if(a==="savekitchen1"){var pk1=S.pantry.filter(function(p){return p.id===id;})[0];if(pk1){pk1.exp=$("#k-exp1").value||"";save();}closeDlg();render();}
+  else if(a==="usedup"){S.pantry=S.pantry.filter(function(p){return p.id!==id;});save();render();K.track("kitchen_used");}
+  else if(a==="tokitchen"){var gg=M.groceries(S,today(),S.listDays),n=0;gg.aisles.forEach(function(ai){ai[1].forEach(function(x){if(S.checked[x.k]){if(!S.pantry.some(function(p){return M.key(p.item)===M.key(x.item);})){S.pantry.push({id:rid(),item:x.item,exp:""});}n++;}});});
+    S.extras=S.extras.filter(function(x){return !S.checked["x|"+x.id];});S.checked={};save();render();toast(n?"Put "+n+" in your kitchen. Add use-by dates for things that go off.":"Nothing ticked.");K.track("kitchen_from_list");}
   else if(a==="viewrecipe")recipeView(byId(id));
   else if(a==="editrecipe")recipeEdit(byId(id));
   else if(a==="fav"){var r2=byId(id);r2.fav=!r2.fav;save();closeDlg();render();}
@@ -215,7 +290,8 @@ document.addEventListener("click",async function(e){
     if(!slots.length){toast("Pick at least one meal.");return;}
     var ppl=Math.min(20,Math.max(1,+$("#af-people").value||2));S.people=ppl;
     var from=week<today()?today():week,days=[];for(var k=0;k<7;k++){var dd=M.addDays(week,k);if(dd>=from)days.push(dd);}
-    var add=M.autoPlan(S,days,{slots:slots,people:ppl,leftovers:$("#af-left").checked,seed:Date.now()%2147483646+1});
+    var pref=M.usesUp(S,M.expiring(S,today(),4)).map(function(x){return x.r.id;});
+    var add=M.autoPlan(S,days,{slots:slots,people:ppl,leftovers:$("#af-left").checked,seed:Date.now()%2147483646+1,prefer:pref});
     if(!add.length){closeDlg();toast("Nothing to fill: those slots are planned, or no recipes are tagged for them.");return;}
     var ids=[];add.forEach(function(m){var id=rid();ids.push(id);(S.plan[m.d]=S.plan[m.d]||[]).push({id:id,slot:m.slot,rid:m.rid,text:m.text,serves:m.serves});});
     lastFill=ids;save();closeDlg();render();K.track("autofill_week");
