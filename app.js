@@ -7,7 +7,7 @@ var SLOTNAME={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",snack:"Snack"}
 function $(s){return document.querySelector(s);}
 function today(){return M.iso(new Date());}
 function rid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
-function dayName(s,long){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString("en-CA",long?{weekday:"long",month:"short",day:"numeric"}:{weekday:"short",day:"numeric"});}
+function dayName(s,long){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(window.PixoraCountry?PixoraCountry.locale():"en-CA",long?{weekday:"long",month:"short",day:"numeric"}:{weekday:"short",day:"numeric"});}
 var tt=null;var lastFill=null;
 function toastUndo(m){var t=$("#toast");t.innerHTML=esc(m)+' <button class="add" data-act="undofill" style="color:inherit;text-decoration:underline">Undo</button>';t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;lastFill=null;},8000);}
 function toast(m){var t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;},3500);}
@@ -115,6 +115,7 @@ function recipesView(){
 }
 function settingsView(){
   var h='<button class="btn q s" data-act="tab" data-t="plan" style="align-self:flex-start">← Back</button><h1>Settings</h1>';
+  if(window.PixoraCountry)h+=PixoraCountry.picker("Sets how dates look here and the country-specific parts of every Pixora app.");
   h+='<section class="card"><h2>Staples</h2><p class="small muted">Things you always have. They stay off the shopping list and show under "Probably have".</p>'+
     '<textarea id="staples" aria-label="Staples, one per line">'+esc(S.staples.join("\n"))+'</textarea><div class="row"><button class="btn" data-act="savestaples">Save staples</button></div></section>';
   h+='<section class="card"><h2>Week starts on</h2><div class="row"><button class="btn'+(S.startDay===1?" p":" q")+' s" data-act="startday" data-n="1">Monday</button><button class="btn'+(S.startDay===0?" p":" q")+' s" data-act="startday" data-n="0">Sunday</button></div></section>';
